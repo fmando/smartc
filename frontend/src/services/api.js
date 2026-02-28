@@ -99,6 +99,26 @@ export async function getTokenDetails(address) {
 }
 
 // ============================================================
+// Wallet
+// ============================================================
+
+export async function getWalletInfo() {
+  return api.get('/wallet/info');
+}
+
+export async function getWalletBalances(address) {
+  return api.get(`/wallet/balances/${address}`);
+}
+
+export async function sendXCB({ to, amount }) {
+  return api.post('/wallet/send-xcb', { to, amount });
+}
+
+export async function sendToken({ contractAddress, to, amount }) {
+  return api.post('/wallet/send-token', { contractAddress, to, amount });
+}
+
+// ============================================================
 // Explorer URLs
 // ============================================================
 

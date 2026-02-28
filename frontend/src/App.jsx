@@ -12,6 +12,7 @@ import DeployStatus from './components/DeployStatus.jsx';
 import TokenList from './components/TokenList.jsx';
 import CipInfoCard from './components/CipInfoCard.jsx';
 import TokenManage from './components/TokenManage.jsx';
+import WalletPage from './components/WalletPage.jsx';
 import { getNetwork } from './services/api.js';
 
 const styles = {
@@ -197,6 +198,7 @@ export default function App() {
             {[
               { id: 'deploy', label: '🚀 Deployen' },
               { id: 'manage', label: '🗂️ Verwalten' },
+              { id: 'wallet', label: '💳 Wallet'    },
             ].map(p => (
               <button
                 key={p.id}
@@ -234,6 +236,11 @@ export default function App() {
         {/* ===== SEITE: VERWALTEN ===== */}
         {page === 'manage' && (
           <TokenManage onBack={() => setPage('deploy')} />
+        )}
+
+        {/* ===== SEITE: WALLET ===== */}
+        {page === 'wallet' && (
+          <WalletPage network={network} />
         )}
 
         {/* ===== SEITE: DEPLOYEN ===== */}

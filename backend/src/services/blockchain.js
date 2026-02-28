@@ -131,6 +131,112 @@ class BlockchainService {
     );
   }
 
+  /** Deployer-Wallet-Adresse und XCB-Balance */
+  async getWalletInfo() {
+    const cfg = this._configs[this.network];
+    let address = cfg.deployerAddress || null;
+
+    // Adresse aus Private Key ableiten (ohne Provider)
+    if (!address && cfg.privateKey) {
+      try {
+        const w = new corebc.Wallet({ key: cfg.privateKey, prefix: cfg.networkPrefix });
+        address = w.address;
+      } catch {}
+    }
+
+    let balance = null;
+    let balanceWei = null;
+    if (address && this.provider) {
+      try {
+        const bal = await this.provider.getBalance(address);
+        balance    = corebc.formatUnits(bal, 18);
+        balanceWei = bal.toString();
+      } catch {}
+    }
+
+    return { address, balance, balanceWei, network: this.network };
+  }
+
+  /** XCB von Deployer-Wallet senden */
+  async sendXCB(to, amountXCB) {
+    const signer   = await this._getSigner();
+    const valueWei = corebc.parseUnits(amountXCB.toString(), 18);
+    const tx       = await signer.sendTransaction({ to, value: valueWei });
+    const receipt  = await tx.wait(1);
+    return {
+      txHash:      receipt.hash,
+      blockNumber: receipt.blockNumber,
+      energyUsed:  (receipt.energyUsed ?? receipt.gasUsed ?? 0n).toString(),
+    };
+  }
+
+  /**
+   * Token-Guthaben einer Adresse abfragen (CIP-20, CIP-777, CIP-721).
+   * @param {string} address   – Abzufragende Adresse
+   * @param {Array}  deployments – Alle Deployment-Einträge aus deployments.json
+   */
+  async getTokenBalancesForAddress(address, deployments) {
+    const networkDeps = deployments.filter(d => d.network === this.network);
+
+    const queries = networkDeps
+      .filter(d => ['CIP-20', 'CIP-777', 'CIP-721'].includes(d.type))
+      .map(async (dep) => {
+        try {
+          const artifactMap = { 'CIP-20': 'CIP20Token', 'CIP-777': 'CIP777Token', 'CIP-721': 'CIP721Token' };
+          const { abi } = this.loadContractArtifacts(artifactMap[dep.type]);
+          const contract = new corebc.Contract(dep.contractAddress, abi, this.provider);
+          const bal      = await contract.balanceOf(address);
+          const decimals = dep.type === 'CIP-721' ? 0 : (dep.decimals ?? 18);
+          return {
+            type:            dep.type,
+            name:            dep.name,
+            symbol:          dep.symbol,
+            contractAddress: dep.contractAddress,
+            balance:         dep.type === 'CIP-721' ? bal.toString() : corebc.formatUnits(bal, decimals),
+            balanceWei:      bal.toString(),
+            decimals,
+          };
+        } catch { return null; }
+      });
+
+    const results = await Promise.allSettled(queries);
+    return results
+      .filter(r => r.status === 'fulfilled' && r.value !== null)
+      .map(r => r.value);
+  }
+
+  /**
+   * Token-Transfer vom Deployer-Wallet.
+   * CIP-20 nutzt transfer(), CIP-777 nutzt send().
+   */
+  async transferToken(contractAddress, to, amount, decimals, tokenType) {
+    const signer = await this._getSigner();
+
+    if (tokenType === 'CIP-777') {
+      const { abi }  = this.loadContractArtifacts('CIP777Token');
+      const contract = new corebc.Contract(contractAddress, abi, signer);
+      const amountWei = corebc.parseUnits(amount.toString(), 18);
+      const tx       = await contract.send(to, amountWei, '0x');
+      const receipt  = await tx.wait(1);
+      return {
+        txHash:      receipt.hash,
+        blockNumber: receipt.blockNumber,
+        energyUsed:  (receipt.energyUsed ?? receipt.gasUsed ?? 0n).toString(),
+      };
+    } else {
+      const { abi }  = this.loadContractArtifacts('CIP20Token');
+      const contract = new corebc.Contract(contractAddress, abi, signer);
+      const amountWei = corebc.parseUnits(amount.toString(), decimals ?? 18);
+      const tx       = await contract.transfer(to, amountWei);
+      const receipt  = await tx.wait(1);
+      return {
+        txHash:      receipt.hash,
+        blockNumber: receipt.blockNumber,
+        energyUsed:  (receipt.energyUsed ?? receipt.gasUsed ?? 0n).toString(),
+      };
+    }
+  }
+
   async getNodeStatus() {
     try {
       const [blockNumber, network] = await Promise.all([

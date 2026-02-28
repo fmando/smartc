@@ -22,6 +22,7 @@ const cip102Router = require('./routes/cip102');
 const cip777Router = require('./routes/cip777');
 const cip721Router = require('./routes/cip721');
 const cip1155Router = require('./routes/cip1155');
+const walletRouter = require('./routes/wallet');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -165,6 +166,7 @@ app.use('/api/cip102', cip102Router);
 app.use('/api/cip777', cip777Router);
 app.use('/api/cip721', cip721Router);
 app.use('/api/cip1155', cip1155Router);
+app.use('/api/wallet', walletRouter);
 
 // 404 für unbekannte API-Routen
 app.use('/api/*', (req, res) => {
