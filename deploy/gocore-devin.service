@@ -1,0 +1,41 @@
+[Unit]
+Description=gocore Devín Testnet Node (Core Coin XCB)
+Documentation=https://github.com/core-coin/go-core
+After=network.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+Group=root
+
+EnvironmentFile=/etc/gocore-devin.conf
+
+ExecStart=/usr/local/bin/gocore \
+  --devin \
+  --http \
+  --http.addr=127.0.0.1 \
+  --http.port=8545 \
+  --http.api=xcb,net,web3,personal,miner \
+  --http.vhosts=* \
+  --keystore=/root/.core/devin/keystore \
+  --miner.corebase=${COREBASE_ADDRESS} \
+  --unlock=${COREBASE_ADDRESS} \
+  --password=/etc/gocore-devin-password.txt \
+  --allow-insecure-unlock \
+  --mine \
+  --miner.threads=1 \
+  --maxpeers=25
+
+Restart=on-failure
+RestartSec=10s
+TimeoutStopSec=30s
+
+StandardOutput=append:/root/smartc/logs/gocore.log
+StandardError=append:/root/smartc/logs/gocore.log
+SyslogIdentifier=gocore-devin
+
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target

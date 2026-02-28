@@ -1,0 +1,33 @@
+[Unit]
+Description=XCB Smart Contract Web App (Node.js)
+Documentation=https://github.com/core-coin/smartc
+After=network.target gocore-devin.service
+Wants=gocore-devin.service
+
+[Service]
+Type=simple
+User=root
+Group=root
+WorkingDirectory=/root/smartc/backend
+
+# Umgebungsvariablen aus .env laden
+EnvironmentFile=/root/smartc/backend/.env
+
+# App starten
+ExecStart=/usr/bin/node src/index.js
+
+# Prozessverwaltung
+Restart=on-failure
+RestartSec=5s
+TimeoutStopSec=15s
+
+# Logging
+StandardOutput=append:/root/smartc/logs/app.log
+StandardError=append:/root/smartc/logs/app.log
+SyslogIdentifier=smartc-app
+
+# Node.js Produktionsmodus
+Environment=NODE_ENV=production
+
+[Install]
+WantedBy=multi-user.target

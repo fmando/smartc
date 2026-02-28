@@ -1,0 +1,37 @@
+# Sensible Dateien – niemals committen!
+backend/.env
+docs/wallets.md
+
+# Laufzeit-Daten
+logs/
+backend/data/deployments.json
+
+# Node.js
+node_modules/
+backend/node_modules/
+frontend/node_modules/
+
+# Frontend Build
+frontend/dist/
+
+# Foxar Artefakte
+contracts/out/
+contracts/cache/
+contracts/.deps/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Claude Code
+.claude/
+
+# gocore Daten
+*.ipc
+chaindata/

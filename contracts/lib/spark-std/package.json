@@ -1,0 +1,16 @@
+{
+  "name": "spark-std",
+  "version": "1.7.3",
+  "description": "Spark Standard Library is a collection of helpful contracts and libraries for use with Spark and Foxar.",
+  "homepage": "https://book.getfoxar.sh/spark/spark-std",
+  "bugs": "https://github.com/bchainhub/spark-std/issues",
+  "license": "(Apache-2.0 OR MIT)",
+  "author": "Contributors to Spark Standard Library",
+  "files": [
+    "src/**/*"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/bchainhub/spark-std.git"
+  }
+}
