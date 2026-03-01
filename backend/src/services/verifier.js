@@ -6,6 +6,7 @@
  */
 
 const { exec } = require('child_process');
+const corebc = require('corebc');
 const db = require('./db');
 
 const CONTRACTS_DIR = '/root/smartc/contracts';
@@ -17,6 +18,43 @@ const CONTRACT_REF = {
   'CIP-1155': 'src/CIP1155Token.sol:CIP1155Token',
   'CIP-102':  'src/CIP102Ownable.sol:CIP102Ownable',
 };
+
+/**
+ * ABI-kodiert die Constructor-Argumente eines Deployments.
+ * Gibt den Hex-String zurück (mit 0x-Prefix) oder null bei Fehler.
+ */
+function buildConstructorArgs(dep) {
+  const coder = new corebc.AbiCoder();
+  try {
+    switch (dep.type) {
+      case 'CIP-20':
+        return coder.encode(
+          ['string', 'string', 'uint8', 'uint256'],
+          [dep.name || '', dep.symbol || '', dep.decimals ?? 18, dep.totalSupply || '0']
+        );
+      case 'CIP-777':
+        return coder.encode(
+          ['string', 'string', 'uint256', 'uint256', 'address[]'],
+          [dep.name || '', dep.symbol || '', dep.initialSupply || '0', dep.granularity ?? 1, []]
+        );
+      case 'CIP-721':
+        return coder.encode(
+          ['string', 'string'],
+          [dep.name || '', dep.symbol || '']
+        );
+      case 'CIP-1155':
+        return coder.encode(
+          ['string'],
+          [dep.uri || '']
+        );
+      default:
+        return null;
+    }
+  } catch (e) {
+    console.warn(`[verifier] ABI-Encode fehlgeschlagen für ${dep.type}:`, e.message);
+    return null;
+  }
+}
 
 /**
  * Startet Verifikation asynchron und aktualisiert den DB-Status.
@@ -31,16 +69,24 @@ function verifyContractAsync(address, cipType, network) {
     return;
   }
 
-  const chain = network === 'mainnet' ? 'mainnet' : 'devin';
-  const cmd = [
-    'spark verify-contract',
-    '--etherscan-api-key noapikey',
-    `--chain ${chain}`,
-    address,
-    `"${contractRef}"`,
-  ].join(' ');
+  const dep = db.getDeployment(address);
+  const constructorArgs = dep ? buildConstructorArgs(dep) : null;
 
-  console.log(`[verifier] Starte Verifikation für ${address} (${cipType}, ${chain})`);
+  const network_flag = network === 'mainnet' ? 'mainnet' : 'devin';
+  const cmdParts = [
+    'spark verify-contract',
+    `-n ${network_flag}`,
+  ];
+  if (constructorArgs) {
+    cmdParts.push(`--constructor-args ${constructorArgs}`);
+  }
+  cmdParts.push(address, `"${contractRef}"`);
+  const cmd = cmdParts.join(' ');
+
+  console.log(`[verifier] Starte Verifikation für ${address} (${cipType}, ${network_flag})`);
+  if (constructorArgs) {
+    console.log(`[verifier] Constructor-Args: ${constructorArgs.slice(0, 80)}...`);
+  }
 
   exec(cmd, { cwd: CONTRACTS_DIR, timeout: 120000 }, (error, stdout, stderr) => {
     if (error) {

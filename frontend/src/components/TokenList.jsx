@@ -5,7 +5,7 @@
  */
 
 import React, { useEffect, useState, useCallback } from 'react';
-import { getDeployments, getExplorerUrl } from '../services/api.js';
+import { getDeployments, getExplorerUrl, retriggerVerify } from '../services/api.js';
 
 const styles = {
   card: {
@@ -118,6 +118,7 @@ export default function TokenList({ refreshTrigger, onManageClick }) {
   const [deployments, setDeployments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [retrying, setRetrying] = useState(new Set());
 
   const fetchDeployments = useCallback(async () => {
     setLoading(true);
@@ -131,6 +132,18 @@ export default function TokenList({ refreshTrigger, onManageClick }) {
       setLoading(false);
     }
   }, []);
+
+  const handleRetry = useCallback(async (address) => {
+    setRetrying((prev) => new Set(prev).add(address));
+    try {
+      await retriggerVerify(address);
+      setTimeout(() => fetchDeployments(), 500);
+    } catch (e) {
+      console.error('Retry fehlgeschlagen:', e.message);
+    } finally {
+      setRetrying((prev) => { const s = new Set(prev); s.delete(address); return s; });
+    }
+  }, [fetchDeployments]);
 
   useEffect(() => {
     fetchDeployments();
@@ -245,10 +258,30 @@ export default function TokenList({ refreshTrigger, onManageClick }) {
                   <td style={{ ...styles.td, color: '#64748b', whiteSpace: 'nowrap' }}>
                     {formatDate(d.timestamp)}
                   </td>
-                  <td style={styles.td}>
+                  <td style={{ ...styles.td, whiteSpace: 'nowrap' }}>
                     <span style={styles.verifyBadge(d.verified)} title={d.verifyError || undefined}>
                       {d.verified === 1 ? '✓ verified' : d.verified === 2 ? '✗ failed' : '⏳ pending'}
                     </span>
+                    {d.verified === 2 && (
+                      <button
+                        onClick={() => handleRetry(d.contractAddress)}
+                        disabled={retrying.has(d.contractAddress)}
+                        title="Verifikation erneut starten"
+                        style={{
+                          marginLeft: '6px',
+                          padding: '1px 6px',
+                          fontSize: '0.72rem',
+                          background: 'transparent',
+                          border: '1px solid rgba(248,113,113,0.4)',
+                          borderRadius: '4px',
+                          color: '#f87171',
+                          cursor: retrying.has(d.contractAddress) ? 'default' : 'pointer',
+                          opacity: retrying.has(d.contractAddress) ? 0.5 : 1,
+                        }}
+                      >
+                        {retrying.has(d.contractAddress) ? '…' : '↻'}
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}
