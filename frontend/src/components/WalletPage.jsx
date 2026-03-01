@@ -10,7 +10,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   getWalletInfo, getWalletBalances, getDeployments,
-  sendXCB, sendToken, getExplorerUrl,
+  sendXCB, sendToken, getExplorerUrl, getTokenDetails,
 } from '../services/api.js';
 
 // ────────────────────────────────────────────
@@ -114,7 +114,16 @@ function TypeBadge({ type }) {
 }
 
 function TokenDetailModal({ token, network, onClose }) {
-  const [copied, setCopied] = useState(false);
+  const [copied,  setCopied]  = useState(false);
+  const [details, setDetails] = useState(null);
+  const [detailsLoading, setDetailsLoading] = useState(true);
+
+  useEffect(() => {
+    getTokenDetails(token.contractAddress)
+      .then(d => setDetails(d))
+      .catch(() => {})
+      .finally(() => setDetailsLoading(false));
+  }, [token.contractAddress]);
 
   function copyAddr() {
     navigator.clipboard.writeText(token.contractAddress);
@@ -122,73 +131,149 @@ function TokenDetailModal({ token, network, onClose }) {
     setTimeout(() => setCopied(false), 1800);
   }
 
-  const color   = TYPE_COLOR[token.type] || '#94a3b8';
-  const explorer = getExplorerUrl(network, 'address', token.contractAddress);
+  function formatDate(iso) {
+    if (!iso) return '–';
+    return new Date(iso).toLocaleString('de-DE', {
+      day: '2-digit', month: '2-digit', year: 'numeric',
+      hour: '2-digit', minute: '2-digit',
+    });
+  }
+
+  function formatSupply(val, decimals, symbol) {
+    if (val === null || val === undefined) return '–';
+    return `${Number(val).toLocaleString('de-DE')} ${symbol || ''}`.trim();
+  }
+
+  const color = TYPE_COLOR[token.type] || '#94a3b8';
+  const d = details;
+
+  // Zeile im Detail-Grid
+  function Row({ label, children }) {
+    return (
+      <div style={{ display: 'grid', gridTemplateColumns: '110px 1fr', gap: '0.5rem', alignItems: 'start', padding: '0.45rem 0', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+        <span style={{ color: '#475569', fontSize: '0.78rem', paddingTop: '1px' }}>{label}</span>
+        <span style={{ fontSize: '0.84rem', color: '#cbd5e1', wordBreak: 'break-all' }}>{children}</span>
+      </div>
+    );
+  }
 
   return (
     <div
       onClick={onClose}
-      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}
+      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}
     >
       <div
         onClick={e => e.stopPropagation()}
-        style={{ background: '#0f172a', border: `1px solid ${color}44`, borderRadius: '14px', padding: '1.6rem', width: '100%', maxWidth: '480px', position: 'relative' }}
+        style={{ background: '#0f172a', border: `1px solid ${color}44`, borderRadius: '14px', padding: '1.6rem', width: '100%', maxWidth: '500px', maxHeight: '90vh', overflowY: 'auto', position: 'relative' }}
       >
         {/* Schließen */}
-        <button
-          onClick={onClose}
-          style={{ position: 'absolute', top: '1rem', right: '1rem', background: 'transparent', border: 'none', color: '#64748b', fontSize: '1.2rem', cursor: 'pointer', lineHeight: 1 }}
-        >
+        <button onClick={onClose} style={{ position: 'absolute', top: '1rem', right: '1rem', background: 'transparent', border: 'none', color: '#64748b', fontSize: '1.2rem', cursor: 'pointer', lineHeight: 1 }}>
           ✕
         </button>
 
         {/* Header */}
-        <div style={{ marginBottom: '1.2rem' }}>
-          <TypeBadge type={token.type} />
-          <span style={{ fontSize: '1.15rem', fontWeight: '700', color: '#e2e8f0' }}>{token.name}</span>
-          <span style={{ marginLeft: '0.5rem', color: '#64748b', fontSize: '0.9rem' }}>({token.symbol})</span>
+        <div style={{ marginBottom: '1.3rem' }}>
+          <div style={{ marginBottom: '0.4rem' }}>
+            <TypeBadge type={token.type} />
+            {d?.verified === 1 && <span style={{ fontSize: '0.72rem', color: '#22c55e', fontWeight: '600' }}>✓ verified</span>}
+          </div>
+          <div style={{ fontSize: '1.2rem', fontWeight: '700', color: '#e2e8f0' }}>{token.name}</div>
+          <div style={{ color: '#64748b', fontSize: '0.88rem', marginTop: '0.1rem' }}>{token.symbol}</div>
         </div>
 
-        {/* Details-Grid */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.7rem', fontSize: '0.86rem' }}>
+        {/* Guthaben-Box */}
+        <div style={{ padding: '0.8rem 1rem', background: `${color}11`, border: `1px solid ${color}33`, borderRadius: '8px', marginBottom: '1rem' }}>
+          <div style={{ color: '#64748b', fontSize: '0.75rem', marginBottom: '0.2rem' }}>Dein Guthaben</div>
+          <div style={{ fontSize: '1.35rem', fontWeight: '700', color }}>
+            {token.type === 'CIP-721'
+              ? `${token.balance} NFT${token.balance !== '1' ? 's' : ''}`
+              : `${Number(token.balance).toLocaleString('de-DE', { maximumFractionDigits: 6 })} ${token.symbol}`}
+          </div>
+          {token.type !== 'CIP-721' && token.decimals !== undefined && (
+            <div style={{ color: '#475569', fontSize: '0.75rem', marginTop: '0.2rem' }}>{token.decimals} Dezimalstellen</div>
+          )}
+        </div>
 
-          {/* Balance */}
-          <div style={{ padding: '0.8rem 1rem', background: `${color}11`, border: `1px solid ${color}33`, borderRadius: '8px' }}>
-            <div style={{ color: '#64748b', fontSize: '0.75rem', marginBottom: '0.2rem' }}>Guthaben</div>
-            <div style={{ fontSize: '1.3rem', fontWeight: '700', color }}>
-              {token.type === 'CIP-721'
-                ? `${token.balance} NFT${token.balance !== '1' ? 's' : ''}`
-                : `${Number(token.balance).toLocaleString('de-DE', { maximumFractionDigits: 6 })} ${token.symbol}`}
-            </div>
-            {token.type !== 'CIP-721' && token.decimals !== undefined && (
-              <div style={{ color: '#475569', fontSize: '0.75rem', marginTop: '0.2rem' }}>{token.decimals} Dezimalstellen</div>
+        {/* Detail-Rows */}
+        {detailsLoading ? (
+          <div style={{ color: '#475569', fontSize: '0.84rem', textAlign: 'center', padding: '1rem 0' }}>Lade Details...</div>
+        ) : (
+          <div style={{ marginBottom: '1rem' }}>
+
+            {/* Contract-Adresse */}
+            <Row label="Contract">
+              <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                <code style={{ fontFamily: 'monospace', fontSize: '0.76rem', color: '#94a3b8', flex: 1 }}>
+                  {token.contractAddress}
+                </code>
+                <button onClick={copyAddr} style={{ padding: '0.15rem 0.5rem', background: copied ? 'rgba(34,197,94,0.15)' : 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '4px', color: copied ? '#86efac' : '#94a3b8', cursor: 'pointer', fontSize: '0.72rem', whiteSpace: 'nowrap' }}>
+                  {copied ? '✓' : '📋'}
+                </button>
+              </div>
+            </Row>
+
+            {/* Erstellt am */}
+            <Row label="Erstellt am">{formatDate(d?.timestamp)}</Row>
+
+            {/* Block */}
+            {d?.blockNumber && (
+              <Row label="Block">
+                <a href={getExplorerUrl(network, 'block', d.blockNumber)} target="_blank" rel="noopener noreferrer" style={{ color: '#60a5fa', textDecoration: 'none' }}>
+                  #{d.blockNumber.toLocaleString('de-DE')} ↗
+                </a>
+              </Row>
             )}
-          </div>
 
-          {/* Contract-Adresse */}
-          <div style={{ padding: '0.7rem 1rem', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '8px' }}>
-            <div style={{ color: '#64748b', fontSize: '0.75rem', marginBottom: '0.35rem' }}>Contract-Adresse</div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-              <code style={{ fontFamily: 'monospace', fontSize: '0.78rem', color: '#94a3b8', wordBreak: 'break-all', flex: 1 }}>
-                {token.contractAddress}
-              </code>
-              <button
-                onClick={copyAddr}
-                style={{ padding: '0.2rem 0.55rem', background: copied ? 'rgba(34,197,94,0.15)' : 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '4px', color: copied ? '#86efac' : '#94a3b8', cursor: 'pointer', fontSize: '0.75rem', whiteSpace: 'nowrap' }}
-              >
-                {copied ? '✓' : '📋'}
-              </button>
-            </div>
-          </div>
+            {/* Creation TX */}
+            {d?.txHash && (
+              <Row label="Creation TX">
+                <a href={getExplorerUrl(network, 'tx', d.txHash)} target="_blank" rel="noopener noreferrer" style={{ color: '#60a5fa', fontFamily: 'monospace', fontSize: '0.76rem', textDecoration: 'none' }}>
+                  {d.txHash.slice(0, 20)}…{d.txHash.slice(-8)} ↗
+                </a>
+              </Row>
+            )}
 
-        </div>
+            {/* Deployer */}
+            {d?.deployer && (
+              <Row label="Deployer">
+                <a href={getExplorerUrl(network, 'address', d.deployer)} target="_blank" rel="noopener noreferrer" style={{ color: '#60a5fa', fontFamily: 'monospace', fontSize: '0.76rem', textDecoration: 'none' }}>
+                  {d.deployer.slice(0, 16)}…{d.deployer.slice(-6)} ↗
+                </a>
+              </Row>
+            )}
+
+            {/* Total Supply */}
+            {(d?.totalSupply || d?.initialSupply) && token.type !== 'CIP-721' && (
+              <Row label="Total Supply">
+                {formatSupply(d.totalSupply ?? d.initialSupply, d.decimals, token.symbol)}
+              </Row>
+            )}
+
+            {/* Energy Used */}
+            {d?.energyUsed && (
+              <Row label="Energy Used">
+                {Number(d.energyUsed).toLocaleString('de-DE')}
+              </Row>
+            )}
+
+            {/* Verifikation */}
+            <Row label="Verifikation">
+              {d?.verified === 1
+                ? <span style={{ color: '#22c55e' }}>✓ Verified {d.verifiedAt ? `(${formatDate(d.verifiedAt)})` : ''}</span>
+                : d?.verified === 2
+                  ? <span style={{ color: '#f87171' }}>✗ Failed</span>
+                  : <span style={{ color: '#eab308' }}>⏳ Pending</span>}
+            </Row>
+
+          </div>
+        )}
 
         {/* Explorer-Link */}
         <a
-          href={explorer}
+          href={getExplorerUrl(network, 'address', token.contractAddress)}
           target="_blank"
           rel="noopener noreferrer"
-          style={{ display: 'block', marginTop: '1.1rem', padding: '0.55rem', textAlign: 'center', background: `${color}18`, border: `1px solid ${color}44`, borderRadius: '7px', color, fontSize: '0.86rem', fontWeight: '600', textDecoration: 'none' }}
+          style={{ display: 'block', padding: '0.55rem', textAlign: 'center', background: `${color}18`, border: `1px solid ${color}44`, borderRadius: '7px', color, fontSize: '0.86rem', fontWeight: '600', textDecoration: 'none' }}
         >
           Im Explorer ansehen ↗
         </a>
