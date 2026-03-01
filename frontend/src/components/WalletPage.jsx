@@ -171,6 +171,13 @@ function WalletInfoCard({ network }) {
           Kein Deployer konfiguriert. Bitte <code>DEPLOYER_PRIVATE_KEY</code> oder <code>DEPLOYER_ADDRESS</code> in <code>.env</code> setzen.
         </div>
       ) : (
+        <>
+        {isMainnet && parseFloat(info?.balance ?? '0') < 1 && (
+          <div style={{ padding: '0.7rem 1rem', background: 'rgba(220,38,38,0.12)', border: '1px solid rgba(220,38,38,0.4)', borderRadius: '8px', marginBottom: '1rem', fontSize: '0.85rem', color: '#fca5a5' }}>
+            <strong>Mainnet nicht bereit</strong> – Balance unter 1 XCB.<br/>
+            Wallet aufladen: <code style={{ wordBreak: 'break-all', color: '#fcd34d' }}>{info.address}</code>
+          </div>
+        )}
         <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr auto', gap: '0.5rem 1.5rem', alignItems: 'center' }}>
           {/* Adresse */}
           <span style={{ color: '#64748b', fontSize: '0.82rem' }}>Adresse</span>
@@ -199,6 +206,7 @@ function WalletInfoCard({ network }) {
           </span>
           <span />
         </div>
+        </>
       )}
     </div>
   );

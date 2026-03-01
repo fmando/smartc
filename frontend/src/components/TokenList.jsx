@@ -77,6 +77,11 @@ const styles = {
     const t = map[type] || { bg: 'rgba(148,163,184,0.15)', color: '#94a3b8' };
     return { padding: '2px 7px', borderRadius: '4px', fontSize: '0.72rem', fontWeight: '700', background: t.bg, color: t.color };
   },
+  verifyBadge: (v) => {
+    if (v === 1) return { color: '#22c55e', fontSize: '0.8rem', fontWeight: '600' };
+    if (v === 2) return { color: '#f87171', fontSize: '0.8rem', fontWeight: '600' };
+    return { color: '#eab308', fontSize: '0.8rem' };
+  },
   empty: {
     textAlign: 'center',
     padding: '3rem',
@@ -182,6 +187,7 @@ export default function TokenList({ refreshTrigger, onManageClick }) {
                 <th style={styles.th}>Block</th>
                 <th style={styles.th}>Netz</th>
                 <th style={styles.th}>Zeit</th>
+                <th style={styles.th}>Status</th>
               </tr>
             </thead>
             <tbody>
@@ -238,6 +244,11 @@ export default function TokenList({ refreshTrigger, onManageClick }) {
                   </td>
                   <td style={{ ...styles.td, color: '#64748b', whiteSpace: 'nowrap' }}>
                     {formatDate(d.timestamp)}
+                  </td>
+                  <td style={styles.td}>
+                    <span style={styles.verifyBadge(d.verified)} title={d.verifyError || undefined}>
+                      {d.verified === 1 ? '✓ verified' : d.verified === 2 ? '✗ failed' : '⏳ pending'}
+                    </span>
                   </td>
                 </tr>
               ))}

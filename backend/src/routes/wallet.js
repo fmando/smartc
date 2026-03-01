@@ -9,19 +9,8 @@
 
 const express = require('express');
 const router  = express.Router();
-const fs      = require('fs');
-const path    = require('path');
 const blockchain = require('../services/blockchain');
-
-const DEPLOYMENTS_FILE =
-  process.env.DEPLOYMENTS_FILE || path.join(__dirname, '../../data/deployments.json');
-
-function loadDeployments() {
-  try {
-    if (!fs.existsSync(DEPLOYMENTS_FILE)) return [];
-    return JSON.parse(fs.readFileSync(DEPLOYMENTS_FILE, 'utf8'));
-  } catch { return []; }
-}
+const db = require('../services/db');
 
 // ============================================================
 // GET /api/wallet/info
@@ -44,7 +33,7 @@ router.get('/balances/:address', async (req, res) => {
     return res.status(400).json({ error: 'Ungültige Adresse (mind. 40 Zeichen)' });
 
   try {
-    const deployments = loadDeployments();
+    const deployments = db.loadDeployments();
     const [xcb, tokens] = await Promise.all([
       blockchain.getBalance(address),
       blockchain.getTokenBalancesForAddress(address, deployments),
@@ -89,10 +78,7 @@ router.post('/send-token', async (req, res) => {
   if (!amount || Number(amount) <= 0)
     return res.status(400).json({ error: 'Betrag muss größer als 0 sein' });
 
-  const deployments = loadDeployments();
-  const token = deployments.find(
-    d => d.contractAddress?.toLowerCase() === contractAddress.toLowerCase()
-  );
+  const token = db.getDeployment(contractAddress);
   const decimals  = token?.decimals  ?? 18;
   const tokenType = token?.type      || 'CIP-20';
 

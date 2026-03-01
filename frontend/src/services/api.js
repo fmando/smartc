@@ -119,6 +119,22 @@ export async function sendToken({ contractAddress, to, amount }) {
 }
 
 // ============================================================
+// Verifikation & ABI
+// ============================================================
+
+export async function getVerifyStatus(addr) {
+  return api.get(`/verify/${addr}`);
+}
+
+export async function retriggerVerify(addr) {
+  return api.post(`/verify/${addr}`);
+}
+
+export async function getTokenAbi(addr) {
+  return api.get(`/tokens/${addr}/abi`);
+}
+
+// ============================================================
 // Explorer URLs
 // ============================================================
 

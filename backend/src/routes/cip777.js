@@ -7,28 +7,10 @@
 
 const express = require('express');
 const router = express.Router();
-const fs = require('fs');
-const path = require('path');
 const blockchain = require('../services/blockchain');
 const compiler = require('../services/compiler');
-
-const DEPLOYMENTS_FILE =
-  process.env.DEPLOYMENTS_FILE || path.join(__dirname, '../../data/deployments.json');
-
-function loadDeployments() {
-  try {
-    if (!fs.existsSync(DEPLOYMENTS_FILE)) return [];
-    return JSON.parse(fs.readFileSync(DEPLOYMENTS_FILE, 'utf8'));
-  } catch { return []; }
-}
-
-function saveDeployment(deployment) {
-  const dir = path.dirname(DEPLOYMENTS_FILE);
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-  const deployments = loadDeployments();
-  deployments.unshift(deployment);
-  fs.writeFileSync(DEPLOYMENTS_FILE, JSON.stringify(deployments, null, 2));
-}
+const db = require('../services/db');
+const verifier = require('../services/verifier');
 
 // ============================================================
 // POST /api/cip777/deploy
@@ -81,7 +63,15 @@ router.post('/deploy', async (req, res) => {
       timestamp: new Date().toISOString(),
     };
 
-    saveDeployment(deployment);
+    db.saveDeployment(deployment);
+
+    try {
+      const { abi } = blockchain.loadContractArtifacts('CIP777Token');
+      db.setAbi(result.contractAddress, abi);
+    } catch (e) { /* non-fatal */ }
+
+    verifier.verifyContractAsync(result.contractAddress, 'CIP-777', deployment.network);
+
     console.log(`[cip777] Deployment erfolgreich: ${result.contractAddress}`);
     res.json({ success: true, message: 'CIP-777 Token erfolgreich deployed!', deployment });
   } catch (err) {
@@ -99,10 +89,7 @@ router.get('/:address', async (req, res) => {
     return res.status(400).json({ error: 'Ungültige Contract-Adresse' });
 
   try {
-    const deployments = loadDeployments();
-    const local = deployments.find(
-      (d) => d.type === 'CIP-777' && d.contractAddress?.toLowerCase() === address.toLowerCase()
-    );
+    const local = db.getDeployment(address);
 
     let onChain = null;
     if (compiler.artifactsExist('CIP777Token')) {

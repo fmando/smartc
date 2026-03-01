@@ -1,47 +1,18 @@
 /**
  * tokens.js – Token-Routen
  *
- * POST /api/tokens/deploy  – CIP-20 Token deployen
- * GET  /api/tokens          – Deployment-Historie
- * GET  /api/tokens/:address – Token-Details
+ * POST /api/tokens/deploy      – CIP-20 Token deployen
+ * GET  /api/tokens              – Deployment-Historie
+ * GET  /api/tokens/:address/abi – ABI abrufen
+ * GET  /api/tokens/:address     – Token-Details
  */
 
 const express = require('express');
 const router = express.Router();
-const fs = require('fs');
-const path = require('path');
 const blockchain = require('../services/blockchain');
 const compiler = require('../services/compiler');
-
-const DEPLOYMENTS_FILE =
-  process.env.DEPLOYMENTS_FILE || path.join(__dirname, '../../data/deployments.json');
-
-// Deployment-Datei initialisieren
-function ensureDeploymentsFile() {
-  const dir = path.dirname(DEPLOYMENTS_FILE);
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-  }
-  if (!fs.existsSync(DEPLOYMENTS_FILE)) {
-    fs.writeFileSync(DEPLOYMENTS_FILE, JSON.stringify([], null, 2));
-  }
-}
-
-function loadDeployments() {
-  ensureDeploymentsFile();
-  try {
-    return JSON.parse(fs.readFileSync(DEPLOYMENTS_FILE, 'utf8'));
-  } catch {
-    return [];
-  }
-}
-
-function saveDeployment(deployment) {
-  ensureDeploymentsFile();
-  const deployments = loadDeployments();
-  deployments.unshift(deployment); // Neueste zuerst
-  fs.writeFileSync(DEPLOYMENTS_FILE, JSON.stringify(deployments, null, 2));
-}
+const db = require('../services/db');
+const verifier = require('../services/verifier');
 
 // ============================================================
 // POST /api/tokens/deploy – CIP-20 Token deployen
@@ -68,7 +39,6 @@ router.post('/deploy', async (req, res) => {
 
   // Prüfen ob Contract-Artefakte vorhanden
   if (!compiler.artifactsExist('CIP20Token')) {
-    // Versuche zu kompilieren
     console.log('[tokens] Keine Artefakte – versuche spark build...');
     const buildResult = compiler.buildContracts();
     if (!buildResult.success) {
@@ -89,7 +59,6 @@ router.post('/deploy', async (req, res) => {
       totalSupply: totalSupply.toString(),
     });
 
-    // Deployment speichern
     const deployment = {
       id: Date.now().toString(),
       type: 'CIP-20',
@@ -106,7 +75,14 @@ router.post('/deploy', async (req, res) => {
       timestamp: new Date().toISOString(),
     };
 
-    saveDeployment(deployment);
+    db.saveDeployment(deployment);
+
+    try {
+      const { abi } = blockchain.loadContractArtifacts('CIP20Token');
+      db.setAbi(result.contractAddress, abi);
+    } catch (e) { /* non-fatal */ }
+
+    verifier.verifyContractAsync(result.contractAddress, 'CIP-20', deployment.network);
 
     console.log(`[tokens] Deployment erfolgreich: ${result.contractAddress}`);
 
@@ -128,8 +104,17 @@ router.post('/deploy', async (req, res) => {
 // GET /api/tokens – Deployment-Historie
 // ============================================================
 router.get('/', (req, res) => {
-  const deployments = loadDeployments();
+  const deployments = db.loadDeployments();
   res.json({ deployments, count: deployments.length });
+});
+
+// ============================================================
+// GET /api/tokens/:address/abi – ABI abrufen
+// ============================================================
+router.get('/:address/abi', (req, res) => {
+  const dep = db.getDeployment(req.params.address);
+  if (!dep?.abi) return res.status(404).json({ error: 'Kein ABI gespeichert' });
+  res.json({ contractAddress: dep.contractAddress, type: dep.type, abi: dep.abi });
 });
 
 // ============================================================
@@ -138,17 +123,12 @@ router.get('/', (req, res) => {
 router.get('/:address', async (req, res) => {
   const { address } = req.params;
 
-  // Basis-Validierung der Adresse
   if (!address || address.length < 40) {
     return res.status(400).json({ error: 'Ungültige Contract-Adresse' });
   }
 
   try {
-    // Zuerst aus lokaler Historie suchen
-    const deployments = loadDeployments();
-    const localDeployment = deployments.find(
-      (d) => d.contractAddress?.toLowerCase() === address.toLowerCase()
-    );
+    const localDeployment = db.getDeployment(address);
 
     // On-Chain Details laden
     let onChainDetails = null;

@@ -17,6 +17,8 @@ const fs = require('fs');
 
 const blockchain = require('./services/blockchain');
 const compiler = require('./services/compiler');
+const db = require('./services/db');
+const verifier = require('./services/verifier');
 const tokensRouter = require('./routes/tokens');
 const cip102Router = require('./routes/cip102');
 const cip777Router = require('./routes/cip777');
@@ -58,6 +60,20 @@ app.get('/api/health', async (req, res) => {
 
   const explorerBase = blockchain.getNetworkConfig().explorer;
 
+  let readyForDeploy = true;
+  let deployerBalance = null;
+
+  if (blockchain.network === 'mainnet') {
+    try {
+      const walletInfo = await blockchain.getWalletInfo();
+      deployerBalance = walletInfo.balance ?? '0';
+      readyForDeploy = parseFloat(deployerBalance) >= 1;
+    } catch {
+      readyForDeploy = false;
+      deployerBalance = '0';
+    }
+  }
+
   res.json({
     status: 'ok',
     app: 'XCB Smart Contract Web App',
@@ -67,6 +83,8 @@ app.get('/api/health', async (req, res) => {
     mining: miningStatus,
     sync: syncStatus,
     explorer: explorerBase,
+    readyForDeploy,
+    deployerBalance,
     timestamp: new Date().toISOString(),
   });
 });
@@ -159,6 +177,28 @@ if (blockchain.network === 'testnet') {
     res.json(result);
   });
 }
+
+// Verifikations-Endpoints
+app.get('/api/verify/:address', (req, res) => {
+  const dep = db.getDeployment(req.params.address);
+  if (!dep) return res.status(404).json({ error: 'Contract nicht gefunden' });
+  const statusMap = { 0: 'pending', 1: 'verified', 2: 'failed' };
+  res.json({
+    contractAddress: dep.contractAddress,
+    type: dep.type,
+    network: dep.network,
+    verified: dep.verified,
+    status: statusMap[dep.verified] || 'pending',
+    verifiedAt: dep.verifiedAt ?? null,
+    verifyError: dep.verifyError ?? null,
+  });
+});
+
+app.post('/api/verify/:address', (req, res) => {
+  const triggered = verifier.retriggerVerification(req.params.address);
+  if (!triggered) return res.status(404).json({ error: 'Contract nicht gefunden' });
+  res.json({ success: true, message: 'Verifikation neu gestartet', status: 'pending' });
+});
 
 // Token-Routen
 app.use('/api/tokens', tokensRouter);
