@@ -271,6 +271,15 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log(`  RPC:     ${process.env.RPC_URL || 'http://127.0.0.1:8545'}`);
   console.log(`  API:     http://localhost:${PORT}/api/health`);
   console.log('='.repeat(50));
+
+  // Pending-Verifikationen aus vorherigen Läufen nachholen
+  const pendingDeps = db.loadDeployments().filter((d) => d.verified === 0);
+  if (pendingDeps.length > 0) {
+    console.log(`[startup] ${pendingDeps.length} ausstehende Verifikation(en) werden neu gestartet...`);
+    for (const dep of pendingDeps) {
+      verifier.retriggerVerification(dep.contractAddress);
+    }
+  }
 });
 
 module.exports = app;

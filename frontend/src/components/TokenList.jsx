@@ -5,7 +5,7 @@
  */
 
 import React, { useEffect, useState, useCallback } from 'react';
-import { getDeployments, getExplorerUrl, retriggerVerify } from '../services/api.js';
+import { getDeployments, getExplorerUrl, retriggerVerify, getTokenAbi } from '../services/api.js';
 
 const styles = {
   card: {
@@ -73,6 +73,7 @@ const styles = {
       'CIP-777':  { bg: 'rgba(124,58,237,0.18)', color: '#a78bfa' },
       'CIP-721':  { bg: 'rgba(34,197,94,0.18)',  color: '#22c55e' },
       'CIP-1155': { bg: 'rgba(234,88,12,0.18)',  color: '#fb923c' },
+      'CIP-102':  { bg: 'rgba(148,163,184,0.15)', color: '#94a3b8' },
     };
     const t = map[type] || { bg: 'rgba(148,163,184,0.15)', color: '#94a3b8' };
     return { padding: '2px 7px', borderRadius: '4px', fontSize: '0.72rem', fontWeight: '700', background: t.bg, color: t.color };
@@ -130,6 +131,21 @@ export default function TokenList({ refreshTrigger, onManageClick }) {
       setError(err.message);
     } finally {
       setLoading(false);
+    }
+  }, []);
+
+  const handleAbiDownload = useCallback(async (address, name) => {
+    try {
+      const data = await getTokenAbi(address);
+      const blob = new Blob([JSON.stringify(data.abi, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${(name || address).slice(0, 20)}_abi.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      console.error('ABI-Download fehlgeschlagen:', e.message);
     }
   }, []);
 
@@ -223,7 +239,7 @@ export default function TokenList({ refreshTrigger, onManageClick }) {
                   <td style={styles.td}>
                     <span style={styles.typeBadge(d.type)}>{d.type || '–'}</span>
                   </td>
-                  <td style={styles.td}>
+                  <td style={{ ...styles.td, whiteSpace: 'nowrap' }}>
                     <a
                       href={getExplorerUrl(d.network, 'address', d.contractAddress)}
                       target="_blank"
@@ -233,6 +249,24 @@ export default function TokenList({ refreshTrigger, onManageClick }) {
                     >
                       {truncate(d.contractAddress)}↗
                     </a>
+                    {d.verified === 1 && (
+                      <button
+                        onClick={() => handleAbiDownload(d.contractAddress, d.name || d.type)}
+                        title="ABI als JSON herunterladen"
+                        style={{
+                          marginLeft: '6px',
+                          padding: '1px 5px',
+                          fontSize: '0.7rem',
+                          background: 'transparent',
+                          border: '1px solid rgba(100,116,139,0.3)',
+                          borderRadius: '3px',
+                          color: '#64748b',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        ABI
+                      </button>
+                    )}
                   </td>
                   <td style={styles.td}>
                     <a

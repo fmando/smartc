@@ -30,12 +30,15 @@ function buildConstructorArgs(dep) {
       case 'CIP-20':
         return coder.encode(
           ['string', 'string', 'uint8', 'uint256'],
-          [dep.name || '', dep.symbol || '', dep.decimals ?? 18, dep.totalSupply || '0']
+          [dep.name || '', dep.symbol || '', dep.decimals ?? 18,
+           corebc.parseUnits((dep.totalSupply || '0').toString(), dep.decimals ?? 18)]
         );
       case 'CIP-777':
         return coder.encode(
           ['string', 'string', 'uint256', 'uint256', 'address[]'],
-          [dep.name || '', dep.symbol || '', dep.initialSupply || '0', dep.granularity ?? 1, []]
+          [dep.name || '', dep.symbol || '',
+           corebc.parseUnits((dep.initialSupply || '0').toString(), 18),
+           dep.granularity ?? 1, []]
         );
       case 'CIP-721':
         return coder.encode(
