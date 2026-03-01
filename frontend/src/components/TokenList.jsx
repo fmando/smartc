@@ -115,11 +115,16 @@ function formatDate(iso) {
   });
 }
 
-export default function TokenList({ refreshTrigger, onManageClick }) {
+export default function TokenList({ refreshTrigger, onManageClick, network = 'testnet' }) {
   const [deployments, setDeployments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [retrying, setRetrying] = useState(new Set());
+  const [filter, setFilter] = useState(network);
+
+  useEffect(() => {
+    setFilter(network);
+  }, [network]);
 
   const fetchDeployments = useCallback(async () => {
     setLoading(true);
@@ -168,9 +173,48 @@ export default function TokenList({ refreshTrigger, onManageClick }) {
   return (
     <div style={styles.card}>
       <div style={styles.header}>
-        <div style={styles.title}>
-          Deployments{' '}
-          {!loading && <span style={styles.badge}>{deployments.length}</span>}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+          <div style={styles.title}>Deployments</div>
+          {/* Filter-Tabs */}
+          <div style={{ display: 'flex', gap: '4px' }}>
+            {[
+              { key: 'all',      label: 'Alle' },
+              { key: 'testnet',  label: 'Testnet' },
+              { key: 'mainnet',  label: 'Mainnet' },
+            ].map(({ key, label }) => {
+              const active = filter === key;
+              const count = key === 'all'
+                ? deployments.length
+                : deployments.filter((d) => d.network === key).length;
+              return (
+                <button
+                  key={key}
+                  onClick={() => setFilter(key)}
+                  style={{
+                    padding: '2px 8px',
+                    fontSize: '0.75rem',
+                    fontWeight: active ? '600' : '400',
+                    border: active
+                      ? `1px solid ${key === 'mainnet' ? 'rgba(220,38,38,0.5)' : 'rgba(37,99,235,0.5)'}`
+                      : '1px solid rgba(255,255,255,0.08)',
+                    borderRadius: '5px',
+                    background: active
+                      ? (key === 'mainnet' ? 'rgba(220,38,38,0.15)' : 'rgba(37,99,235,0.15)')
+                      : 'transparent',
+                    color: active
+                      ? (key === 'mainnet' ? '#f87171' : '#60a5fa')
+                      : '#64748b',
+                    cursor: 'pointer',
+                  }}
+                >
+                  {label}
+                  {count > 0 && (
+                    <span style={{ marginLeft: '4px', opacity: 0.7 }}>{count}</span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
         </div>
         <div style={{ display: 'flex', gap: '0.5rem' }}>
           {onManageClick && (
@@ -204,8 +248,17 @@ export default function TokenList({ refreshTrigger, onManageClick }) {
         </div>
       )}
 
-      {!loading && !error && deployments.length > 0 && (
+      {!loading && !error && deployments.length > 0 && (() => {
+        const visible = filter === 'all'
+          ? deployments
+          : deployments.filter((d) => d.network === filter);
+        return (
         <div style={{ overflowX: 'auto' }}>
+          {visible.length === 0 ? (
+            <div style={styles.empty}>
+              Keine {filter === 'mainnet' ? 'Mainnet' : 'Testnet'}-Deployments vorhanden.
+            </div>
+          ) : (
           <table style={styles.table}>
             <thead>
               <tr>
@@ -214,13 +267,13 @@ export default function TokenList({ refreshTrigger, onManageClick }) {
                 <th style={styles.th}>Contract</th>
                 <th style={styles.th}>TX</th>
                 <th style={styles.th}>Block</th>
-                <th style={styles.th}>Netz</th>
+                {filter === 'all' && <th style={styles.th}>Netz</th>}
                 <th style={styles.th}>Zeit</th>
                 <th style={styles.th}>Status</th>
               </tr>
             </thead>
             <tbody>
-              {deployments.map((d) => (
+              {visible.map((d) => (
                 <tr key={d.id || d.txHash} style={{ transition: 'background 0.1s' }}
                   onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.03)'}
                   onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
@@ -284,11 +337,13 @@ export default function TokenList({ refreshTrigger, onManageClick }) {
                       #{d.blockNumber?.toLocaleString() || '–'}
                     </span>
                   </td>
-                  <td style={styles.td}>
-                    <span style={styles.networkBadge(d.network)}>
-                      {d.network === 'mainnet' ? 'Main' : 'Devín'}
-                    </span>
-                  </td>
+                  {filter === 'all' && (
+                    <td style={styles.td}>
+                      <span style={styles.networkBadge(d.network)}>
+                        {d.network === 'mainnet' ? 'Main' : 'Devín'}
+                      </span>
+                    </td>
+                  )}
                   <td style={{ ...styles.td, color: '#64748b', whiteSpace: 'nowrap' }}>
                     {formatDate(d.timestamp)}
                   </td>
@@ -321,8 +376,10 @@ export default function TokenList({ refreshTrigger, onManageClick }) {
               ))}
             </tbody>
           </table>
+          )}
         </div>
-      )}
+        );
+      })()}
     </div>
   );
 }

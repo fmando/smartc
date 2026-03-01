@@ -334,6 +334,7 @@ export default function App() {
             <TokenList
               refreshTrigger={listRefresh}
               onManageClick={() => setPage('manage')}
+              network={network}
             />
           </>
         )}
