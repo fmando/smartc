@@ -113,6 +113,90 @@ function TypeBadge({ type }) {
   );
 }
 
+function TokenDetailModal({ token, network, onClose }) {
+  const [copied, setCopied] = useState(false);
+
+  function copyAddr() {
+    navigator.clipboard.writeText(token.contractAddress);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1800);
+  }
+
+  const color   = TYPE_COLOR[token.type] || '#94a3b8';
+  const explorer = getExplorerUrl(network, 'address', token.contractAddress);
+
+  return (
+    <div
+      onClick={onClose}
+      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}
+    >
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{ background: '#0f172a', border: `1px solid ${color}44`, borderRadius: '14px', padding: '1.6rem', width: '100%', maxWidth: '480px', position: 'relative' }}
+      >
+        {/* Schließen */}
+        <button
+          onClick={onClose}
+          style={{ position: 'absolute', top: '1rem', right: '1rem', background: 'transparent', border: 'none', color: '#64748b', fontSize: '1.2rem', cursor: 'pointer', lineHeight: 1 }}
+        >
+          ✕
+        </button>
+
+        {/* Header */}
+        <div style={{ marginBottom: '1.2rem' }}>
+          <TypeBadge type={token.type} />
+          <span style={{ fontSize: '1.15rem', fontWeight: '700', color: '#e2e8f0' }}>{token.name}</span>
+          <span style={{ marginLeft: '0.5rem', color: '#64748b', fontSize: '0.9rem' }}>({token.symbol})</span>
+        </div>
+
+        {/* Details-Grid */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.7rem', fontSize: '0.86rem' }}>
+
+          {/* Balance */}
+          <div style={{ padding: '0.8rem 1rem', background: `${color}11`, border: `1px solid ${color}33`, borderRadius: '8px' }}>
+            <div style={{ color: '#64748b', fontSize: '0.75rem', marginBottom: '0.2rem' }}>Guthaben</div>
+            <div style={{ fontSize: '1.3rem', fontWeight: '700', color }}>
+              {token.type === 'CIP-721'
+                ? `${token.balance} NFT${token.balance !== '1' ? 's' : ''}`
+                : `${Number(token.balance).toLocaleString('de-DE', { maximumFractionDigits: 6 })} ${token.symbol}`}
+            </div>
+            {token.type !== 'CIP-721' && token.decimals !== undefined && (
+              <div style={{ color: '#475569', fontSize: '0.75rem', marginTop: '0.2rem' }}>{token.decimals} Dezimalstellen</div>
+            )}
+          </div>
+
+          {/* Contract-Adresse */}
+          <div style={{ padding: '0.7rem 1rem', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '8px' }}>
+            <div style={{ color: '#64748b', fontSize: '0.75rem', marginBottom: '0.35rem' }}>Contract-Adresse</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+              <code style={{ fontFamily: 'monospace', fontSize: '0.78rem', color: '#94a3b8', wordBreak: 'break-all', flex: 1 }}>
+                {token.contractAddress}
+              </code>
+              <button
+                onClick={copyAddr}
+                style={{ padding: '0.2rem 0.55rem', background: copied ? 'rgba(34,197,94,0.15)' : 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '4px', color: copied ? '#86efac' : '#94a3b8', cursor: 'pointer', fontSize: '0.75rem', whiteSpace: 'nowrap' }}
+              >
+                {copied ? '✓' : '📋'}
+              </button>
+            </div>
+          </div>
+
+        </div>
+
+        {/* Explorer-Link */}
+        <a
+          href={explorer}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{ display: 'block', marginTop: '1.1rem', padding: '0.55rem', textAlign: 'center', background: `${color}18`, border: `1px solid ${color}44`, borderRadius: '7px', color, fontSize: '0.86rem', fontWeight: '600', textDecoration: 'none' }}
+        >
+          Im Explorer ansehen ↗
+        </a>
+      </div>
+    </div>
+  );
+}
+
 function truncate(str, len = 16) {
   if (!str || str.length <= len * 2) return str;
   return `${str.slice(0, len)}…${str.slice(-8)}`;
@@ -216,10 +300,11 @@ function WalletInfoCard({ network }) {
 // Guthaben abfragen
 // ────────────────────────────────────────────
 function BalanceChecker({ network, deployerAddress }) {
-  const [address, setAddress] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [result,  setResult]  = useState(null);
-  const [error,   setError]   = useState(null);
+  const [address,       setAddress]       = useState('');
+  const [loading,       setLoading]       = useState(false);
+  const [result,        setResult]        = useState(null);
+  const [error,         setError]         = useState(null);
+  const [selectedToken, setSelectedToken] = useState(null);
 
   async function handleCheck(e) {
     e.preventDefault();
@@ -272,6 +357,15 @@ function BalanceChecker({ network, deployerAddress }) {
         </PrimaryBtn>
       </form>
 
+      {/* Token-Detail-Modal */}
+      {selectedToken && (
+        <TokenDetailModal
+          token={selectedToken}
+          network={network}
+          onClose={() => setSelectedToken(null)}
+        />
+      )}
+
       {/* Ergebnis */}
       {result && (
         <div style={{ marginTop: '1.2rem' }}>
@@ -287,22 +381,29 @@ function BalanceChecker({ network, deployerAddress }) {
           {result.tokens.length > 0 ? (
             <div>
               <div style={{ fontSize: '0.78rem', color: '#64748b', marginBottom: '0.5rem', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                Token-Bestände
+                Token-Bestände <span style={{ fontWeight: '400', color: '#334155' }}>– klicken für Details</span>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                 {result.tokens.map((t, i) => (
-                  <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.5rem 0.7rem', background: 'rgba(255,255,255,0.03)', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.06)' }}>
+                  <div
+                    key={i}
+                    onClick={() => setSelectedToken(t)}
+                    style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.5rem 0.7rem', background: 'rgba(255,255,255,0.03)', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.06)', cursor: 'pointer', transition: 'background 0.12s, border-color 0.12s' }}
+                    onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.07)'; e.currentTarget.style.borderColor = `${TYPE_COLOR[t.type] || '#94a3b8'}55`; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.03)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)'; }}
+                  >
                     <div>
                       <TypeBadge type={t.type} />
                       <span style={{ fontWeight: '600', fontSize: '0.88rem' }}>{t.symbol || t.name}</span>
                       {t.name && t.symbol && <span style={{ color: '#64748b', fontSize: '0.78rem', marginLeft: '0.4rem' }}>{t.name}</span>}
                     </div>
-                    <div style={{ textAlign: 'right' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                       <span style={{ fontWeight: '600', fontSize: '0.9rem', color: TYPE_COLOR[t.type] || '#e2e8f0' }}>
                         {t.type === 'CIP-721'
                           ? `${t.balance} NFT${t.balance !== '1' ? 's' : ''}`
                           : Number(t.balance).toLocaleString('de-DE', { maximumFractionDigits: 4 })}
                       </span>
+                      <span style={{ color: '#334155', fontSize: '0.75rem' }}>›</span>
                     </div>
                   </div>
                 ))}
@@ -501,7 +602,11 @@ function SendToken({ network }) {
               style={{ ...inputStyle, cursor: 'pointer' }}
             >
               {tokens.map(t => (
-                <option key={t.contractAddress} value={t.contractAddress}>
+                <option
+                  key={t.contractAddress}
+                  value={t.contractAddress}
+                  style={{ background: '#1e293b', color: '#e2e8f0' }}
+                >
                   [{t.type}] {t.symbol} – {t.name}
                 </option>
               ))}
