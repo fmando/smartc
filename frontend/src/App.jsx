@@ -13,6 +13,7 @@ import TokenList from './components/TokenList.jsx';
 import CipInfoCard from './components/CipInfoCard.jsx';
 import TokenManage from './components/TokenManage.jsx';
 import WalletPage from './components/WalletPage.jsx';
+import TokenInfoPage from './components/TokenInfoPage.jsx';
 import { getNetwork } from './services/api.js';
 
 const styles = {
@@ -196,9 +197,10 @@ export default function App() {
           {/* Seiten-Navigation */}
           <nav style={{ display: 'flex', gap: '0.25rem', marginRight: '0.5rem' }}>
             {[
-              { id: 'deploy', label: '🚀 Deployen' },
-              { id: 'manage', label: '🗂️ Verwalten' },
-              { id: 'wallet', label: '💳 Wallet'    },
+              { id: 'deploy',     label: '🚀 Deployen'   },
+              { id: 'manage',     label: '🗂️ Verwalten'  },
+              { id: 'tokeninfo',  label: '🪙 Tokeninfo'  },
+              { id: 'wallet',     label: '💳 Wallet'     },
             ].map(p => (
               <button
                 key={p.id}
@@ -236,6 +238,11 @@ export default function App() {
         {/* ===== SEITE: VERWALTEN ===== */}
         {page === 'manage' && (
           <TokenManage onBack={() => setPage('deploy')} />
+        )}
+
+        {/* ===== SEITE: TOKENINFO ===== */}
+        {page === 'tokeninfo' && (
+          <TokenInfoPage />
         )}
 
         {/* ===== SEITE: WALLET ===== */}
