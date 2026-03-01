@@ -77,7 +77,7 @@ function verifyContractAsync(address, cipType, network) {
 
   const network_flag = network === 'mainnet' ? 'mainnet' : 'devin';
   const cmdParts = [
-    'spark verify-contract',
+    '/root/.foxar/bin/spark verify-contract',
     `-n ${network_flag}`,
   ];
   if (constructorArgs) {
