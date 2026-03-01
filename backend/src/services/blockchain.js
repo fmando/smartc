@@ -213,9 +213,12 @@ class BlockchainService {
 
   /**
    * Token-Transfer vom Deployer-Wallet.
-   * CIP-20 nutzt transfer(), CIP-777 nutzt send().
+   * CIP-20  → transfer()
+   * CIP-777 → send()
+   * CIP-721 → safeTransferFrom(from, to, tokenId)
+   * CIP-1155→ safeTransferFrom(from, to, id, amount, data)
    */
-  async transferToken(contractAddress, to, amount, decimals, tokenType) {
+  async transferToken(contractAddress, to, amount, decimals, tokenType, tokenId) {
     const signer = await this._getSigner();
 
     if (tokenType === 'CIP-777') {
@@ -224,6 +227,32 @@ class BlockchainService {
       const amountWei = corebc.parseUnits(amount.toString(), 18);
       const tx       = await contract.send(to, amountWei, '0x');
       const receipt  = await tx.wait(1);
+      return {
+        txHash:      receipt.hash,
+        blockNumber: receipt.blockNumber,
+        energyUsed:  (receipt.energyUsed ?? receipt.gasUsed ?? 0n).toString(),
+      };
+    } else if (tokenType === 'CIP-721') {
+      const { abi }  = this.loadContractArtifacts('CIP721Token');
+      const contract = new corebc.Contract(contractAddress, abi, signer);
+      const from     = typeof signer.getAddress === 'function'
+        ? await signer.getAddress()
+        : (this._configs[this.network].deployerAddress || '');
+      const tx = await contract['safeTransferFrom(address,address,uint256)'](from, to, BigInt(tokenId));
+      const receipt = await tx.wait(1);
+      return {
+        txHash:      receipt.hash,
+        blockNumber: receipt.blockNumber,
+        energyUsed:  (receipt.energyUsed ?? receipt.gasUsed ?? 0n).toString(),
+      };
+    } else if (tokenType === 'CIP-1155') {
+      const { abi }  = this.loadContractArtifacts('CIP1155Token');
+      const contract = new corebc.Contract(contractAddress, abi, signer);
+      const from     = typeof signer.getAddress === 'function'
+        ? await signer.getAddress()
+        : (this._configs[this.network].deployerAddress || '');
+      const tx = await contract.safeTransferFrom(from, to, BigInt(tokenId), BigInt(amount), '0x');
+      const receipt = await tx.wait(1);
       return {
         txHash:      receipt.hash,
         blockNumber: receipt.blockNumber,

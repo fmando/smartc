@@ -612,13 +612,14 @@ function SendXCB({ network, currency }) {
 }
 
 // ────────────────────────────────────────────
-// Token senden
+// Token senden (CIP-20 / CIP-777 / CIP-721 / CIP-1155)
 // ────────────────────────────────────────────
 function SendToken({ network }) {
   const [tokens,   setTokens]   = useState([]);
   const [selected, setSelected] = useState('');
   const [to,       setTo]       = useState('');
   const [amount,   setAmount]   = useState('');
+  const [tokenId,  setTokenId]  = useState('');
   const [loading,  setLoading]  = useState(false);
   const [result,   setResult]   = useState(null);
   const [error,    setError]    = useState(null);
@@ -626,12 +627,12 @@ function SendToken({ network }) {
 
   const isMainnet = network === 'mainnet';
 
-  // Sendbare Token laden (CIP-20 + CIP-777 des aktuellen Netzwerks)
+  // Alle sendbaren Token des aktuellen Netzwerks laden
   useEffect(() => {
     getDeployments()
       .then(data => {
         const sendable = (data.deployments || [])
-          .filter(d => ['CIP-20', 'CIP-777'].includes(d.type) && d.network === network);
+          .filter(d => ['CIP-20', 'CIP-777', 'CIP-721', 'CIP-1155'].includes(d.type) && d.network === network);
         setTokens(sendable);
         if (sendable.length > 0) setSelected(sendable[0].contractAddress);
       })
@@ -639,12 +640,18 @@ function SendToken({ network }) {
   }, [network]);
 
   const selectedToken = tokens.find(t => t.contractAddress === selected);
+  const isNFT         = selectedToken?.type === 'CIP-721';
+  const isMultiToken  = selectedToken?.type === 'CIP-1155';
+  const needsTokenId  = isNFT || isMultiToken;
+
+  function reset() { setTo(''); setAmount(''); setTokenId(''); }
 
   async function handleSubmit(e) {
     e.preventDefault();
-    if (!selected)                       return setError('Bitte einen Token auswählen');
-    if (!to.trim())                      return setError('Empfänger-Adresse ist erforderlich');
-    if (!amount || Number(amount) <= 0)  return setError('Betrag muss größer als 0 sein');
+    if (!selected)       return setError('Bitte einen Token auswählen');
+    if (!to.trim())      return setError('Empfänger-Adresse ist erforderlich');
+    if (needsTokenId && tokenId === '') return setError('Token ID ist erforderlich');
+    if (!isNFT && (!amount || Number(amount) <= 0)) return setError('Betrag muss größer als 0 sein');
 
     if (isMainnet && !confirm) { setConfirm(true); return; }
     setConfirm(false);
@@ -653,10 +660,14 @@ function SendToken({ network }) {
     setError(null);
     setResult(null);
     try {
-      const res = await sendToken({ contractAddress: selected, to: to.trim(), amount });
-      setResult({ ...res, symbol: selectedToken?.symbol });
-      setTo('');
-      setAmount('');
+      const res = await sendToken({
+        contractAddress: selected,
+        to:      to.trim(),
+        amount:  isNFT ? '1' : amount,
+        tokenId: needsTokenId ? tokenId : undefined,
+      });
+      setResult({ ...res, symbol: selectedToken?.symbol, type: selectedToken?.type, tokenId });
+      reset();
     } catch (err) {
       setError(err.message);
     } finally {
@@ -666,6 +677,12 @@ function SendToken({ network }) {
 
   const accentColor = selectedToken ? (TYPE_COLOR[selectedToken.type] || '#60a5fa') : '#60a5fa';
 
+  function confirmLabel() {
+    if (isNFT)        return `NFT #${tokenId}`;
+    if (isMultiToken) return `${amount}× Token ID #${tokenId}`;
+    return `${amount} ${selectedToken?.symbol}`;
+  }
+
   return (
     <div style={card}>
       <h3 style={{ fontSize: '0.95rem', fontWeight: '600', marginBottom: '1rem', color: '#22c55e' }}>
@@ -674,7 +691,7 @@ function SendToken({ network }) {
 
       {tokens.length === 0 ? (
         <div style={{ color: '#475569', fontSize: '0.86rem', padding: '1rem 0' }}>
-          Keine CIP-20 / CIP-777 Tokens auf diesem Netz deployed.
+          Keine Tokens auf diesem Netz deployed.
         </div>
       ) : (
         <form onSubmit={handleSubmit}>
@@ -683,7 +700,7 @@ function SendToken({ network }) {
             <label style={labelStyle}>Token</label>
             <select
               value={selected}
-              onChange={e => { setSelected(e.target.value); setError(null); setConfirm(false); }}
+              onChange={e => { setSelected(e.target.value); setError(null); setConfirm(false); setTokenId(''); setAmount(''); }}
               style={{ ...inputStyle, cursor: 'pointer' }}
             >
               {tokens.map(t => (
@@ -692,13 +709,15 @@ function SendToken({ network }) {
                   value={t.contractAddress}
                   style={{ background: '#1e293b', color: '#e2e8f0' }}
                 >
-                  [{t.type}] {t.symbol} – {t.name}
+                  [{t.type}] {t.symbol || t.name}
+                  {t.name && t.symbol ? ` – ${t.name}` : ''}
                 </option>
               ))}
             </select>
             {selectedToken && (
               <div style={hintStyle}>
-                {truncate(selectedToken.contractAddress, 18)} · {selectedToken.decimals ?? 18} Decimals
+                {truncate(selectedToken.contractAddress, 18)}
+                {!needsTokenId && ` · ${selectedToken.decimals ?? 18} Decimals`}
               </div>
             )}
           </div>
@@ -714,26 +733,54 @@ function SendToken({ network }) {
             />
           </div>
 
-          {/* Betrag */}
-          <div style={{ marginBottom: '0.5rem' }}>
-            <label style={labelStyle}>Betrag ({selectedToken?.symbol || 'Token'})</label>
-            <input
-              type="number"
-              value={amount}
-              onChange={e => { setAmount(e.target.value); setError(null); setConfirm(false); }}
-              placeholder="0"
-              min="0"
-              step="any"
-              style={inputStyle}
-            />
-            <div style={hintStyle}>In Token-Einheiten (nicht Wei).</div>
-          </div>
+          {/* Token ID (nur für CIP-721 und CIP-1155) */}
+          {needsTokenId && (
+            <div style={{ marginBottom: '0.9rem' }}>
+              <label style={labelStyle}>Token ID</label>
+              <input
+                type="number"
+                value={tokenId}
+                onChange={e => { setTokenId(e.target.value); setError(null); setConfirm(false); }}
+                placeholder="0"
+                min="0"
+                step="1"
+                style={inputStyle}
+              />
+              <div style={hintStyle}>
+                {isNFT ? 'ID des NFT (wird als einzelnes Stück übertragen).' : 'ID des Token-Typs innerhalb des CIP-1155 Contracts.'}
+              </div>
+            </div>
+          )}
+
+          {/* Betrag (nicht für CIP-721) */}
+          {!isNFT && (
+            <div style={{ marginBottom: '0.5rem' }}>
+              <label style={labelStyle}>
+                {isMultiToken ? 'Anzahl' : `Betrag (${selectedToken?.symbol || 'Token'})`}
+              </label>
+              <input
+                type="number"
+                value={amount}
+                onChange={e => { setAmount(e.target.value); setError(null); setConfirm(false); }}
+                placeholder="0"
+                min="0"
+                step={isMultiToken ? '1' : 'any'}
+                style={inputStyle}
+              />
+              <div style={hintStyle}>
+                {isMultiToken ? 'Anzahl der zu sendenden Einheiten.' : 'In Token-Einheiten (nicht Wei).'}
+              </div>
+            </div>
+          )}
 
           <ErrorBox msg={error} />
 
           {result && (
             <SuccessBox>
-              {result.symbol || 'Token'} gesendet! TX:{' '}
+              {result.type === 'CIP-721'
+                ? `NFT #${result.tokenId} übertragen!`
+                : `${result.symbol || 'Token'} gesendet!`
+              }{' '}TX:{' '}
               <a
                 href={getExplorerUrl(network, 'tx', result.txHash)}
                 target="_blank" rel="noopener noreferrer"
@@ -746,7 +793,7 @@ function SendToken({ network }) {
 
           {confirm && (
             <div style={{ padding: '0.8rem', background: 'rgba(220,38,38,0.1)', border: '1px solid rgba(220,38,38,0.3)', borderRadius: '7px', marginTop: '0.6rem', fontSize: '0.85rem', color: '#fca5a5' }}>
-              <strong>Mainnet bestätigen:</strong> Wirklich {amount} {selectedToken?.symbol} an {truncate(to, 10)} senden?
+              <strong>Mainnet bestätigen:</strong> Wirklich {confirmLabel()} an {truncate(to, 10)} senden?
               <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
                 <button type="submit" disabled={loading} style={{ flex: 1, padding: '0.5rem', background: '#dc2626', border: 'none', borderRadius: '5px', color: 'white', cursor: 'pointer', fontWeight: '600', fontSize: '0.85rem' }}>
                   {loading ? '⏳...' : 'Ja, senden'}
@@ -760,7 +807,13 @@ function SendToken({ network }) {
 
           {!confirm && (
             <PrimaryBtn loading={loading} color={isMainnet ? '#dc2626' : '#16a34a'}>
-              {loading ? '⏳ Sende...' : isMainnet ? `⚠️ ${selectedToken?.symbol || 'Token'} senden (Mainnet)` : `🪙 ${selectedToken?.symbol || 'Token'} senden`}
+              {loading
+                ? '⏳ Sende...'
+                : isMainnet
+                  ? `⚠️ ${isNFT ? 'NFT' : selectedToken?.symbol || 'Token'} senden (Mainnet)`
+                  : isNFT
+                    ? '🖼️ NFT senden'
+                    : `🪙 ${selectedToken?.symbol || 'Token'} senden`}
             </PrimaryBtn>
           )}
         </form>

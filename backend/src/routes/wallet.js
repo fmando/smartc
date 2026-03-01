@@ -101,22 +101,35 @@ router.post('/send-xcb', async (req, res) => {
 // POST /api/wallet/send-token
 // ============================================================
 router.post('/send-token', async (req, res) => {
-  const { contractAddress, to, amount } = req.body;
+  const { contractAddress, to, amount, tokenId } = req.body;
 
   if (!contractAddress || contractAddress.length < 40)
     return res.status(400).json({ error: 'Ungültige Contract-Adresse' });
   if (!to || to.trim().length < 40)
     return res.status(400).json({ error: 'Ungültige Empfänger-Adresse' });
-  if (!amount || Number(amount) <= 0)
-    return res.status(400).json({ error: 'Betrag muss größer als 0 sein' });
 
   const token = db.getDeployment(contractAddress);
   const decimals  = token?.decimals  ?? 18;
   const tokenType = token?.type      || 'CIP-20';
 
+  // Typ-spezifische Validierung
+  if (tokenType === 'CIP-721') {
+    if (tokenId === undefined || tokenId === null || tokenId === '')
+      return res.status(400).json({ error: 'Token ID ist erforderlich für CIP-721' });
+  } else if (tokenType === 'CIP-1155') {
+    if (tokenId === undefined || tokenId === null || tokenId === '')
+      return res.status(400).json({ error: 'Token ID ist erforderlich für CIP-1155' });
+    if (!amount || Number(amount) <= 0)
+      return res.status(400).json({ error: 'Betrag muss größer als 0 sein' });
+  } else {
+    if (!amount || Number(amount) <= 0)
+      return res.status(400).json({ error: 'Betrag muss größer als 0 sein' });
+  }
+
   try {
-    console.log(`[wallet] Sende ${amount} ${token?.symbol || 'Token'} (${tokenType}) → ${to.trim().slice(0, 14)}...`);
-    const result = await blockchain.transferToken(contractAddress, to.trim(), amount, decimals, tokenType);
+    const logAmt = tokenType === 'CIP-721' ? `NFT #${tokenId}` : `${amount} ${token?.symbol || 'Token'}`;
+    console.log(`[wallet] Sende ${logAmt} (${tokenType}) → ${to.trim().slice(0, 14)}...`);
+    const result = await blockchain.transferToken(contractAddress, to.trim(), amount || '1', decimals, tokenType, tokenId);
     res.json({ success: true, ...result });
   } catch (err) {
     console.error('[wallet] Token-Transfer Fehler:', err.message);

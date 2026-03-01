@@ -114,8 +114,8 @@ export async function sendXCB({ to, amount }) {
   return api.post('/wallet/send-xcb', { to, amount });
 }
 
-export async function sendToken({ contractAddress, to, amount }) {
-  return api.post('/wallet/send-token', { contractAddress, to, amount });
+export async function sendToken({ contractAddress, to, amount, tokenId }) {
+  return api.post('/wallet/send-token', { contractAddress, to, amount, tokenId });
 }
 
 // ============================================================
