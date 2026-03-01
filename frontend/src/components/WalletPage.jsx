@@ -290,7 +290,7 @@ function truncate(str, len = 16) {
 // ────────────────────────────────────────────
 // Deployer-Wallet-Karte
 // ────────────────────────────────────────────
-function WalletInfoCard({ network }) {
+function WalletInfoCard({ network, currency }) {
   const [info, setInfo]       = useState(null);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied]   = useState(false);
@@ -343,7 +343,7 @@ function WalletInfoCard({ network }) {
         <>
         {isMainnet && parseFloat(info?.balance ?? '0') < 1 && (
           <div style={{ padding: '0.7rem 1rem', background: 'rgba(220,38,38,0.12)', border: '1px solid rgba(220,38,38,0.4)', borderRadius: '8px', marginBottom: '1rem', fontSize: '0.85rem', color: '#fca5a5' }}>
-            <strong>Mainnet nicht bereit</strong> – Balance unter 1 XCB.<br/>
+            <strong>Mainnet nicht bereit</strong> – Balance unter 1 {currency}.<br/>
             Wallet aufladen: <code style={{ wordBreak: 'break-all', color: '#fcd34d' }}>{info.address}</code>
           </div>
         )}
@@ -364,7 +364,7 @@ function WalletInfoCard({ network }) {
           {/* Balance */}
           <span style={{ color: '#64748b', fontSize: '0.82rem' }}>Guthaben</span>
           <span style={{ fontSize: '1.2rem', fontWeight: '700', color: isMainnet ? '#fca5a5' : '#60a5fa' }}>
-            {info.balance !== null ? `${Number(info.balance).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 4 })} XCB` : '–'}
+            {info.balance !== null ? `${Number(info.balance).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 4 })} ${currency}` : '–'}
           </span>
           <span />
 
@@ -384,7 +384,7 @@ function WalletInfoCard({ network }) {
 // ────────────────────────────────────────────
 // Guthaben abfragen
 // ────────────────────────────────────────────
-function BalanceChecker({ network, deployerAddress }) {
+function BalanceChecker({ network, deployerAddress, currency }) {
   const [address,       setAddress]       = useState('');
   const [loading,       setLoading]       = useState(false);
   const [result,        setResult]        = useState(null);
@@ -456,9 +456,9 @@ function BalanceChecker({ network, deployerAddress }) {
         <div style={{ marginTop: '1.2rem' }}>
           {/* XCB */}
           <div style={{ padding: '0.7rem 0.9rem', background: 'rgba(37,99,235,0.08)', border: '1px solid rgba(37,99,235,0.2)', borderRadius: '8px', marginBottom: '0.8rem' }}>
-            <div style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '0.2rem' }}>XCB-Guthaben</div>
+            <div style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '0.2rem' }}>{currency}-Guthaben</div>
             <div style={{ fontSize: '1.3rem', fontWeight: '700', color: '#60a5fa' }}>
-              {Number(result.xcb.balance).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 6 })} XCB
+              {Number(result.xcb.balance).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 6 })} {currency}
             </div>
           </div>
 
@@ -508,7 +508,7 @@ function BalanceChecker({ network, deployerAddress }) {
 // ────────────────────────────────────────────
 // XCB senden
 // ────────────────────────────────────────────
-function SendXCB({ network }) {
+function SendXCB({ network, currency }) {
   const [to,      setTo]      = useState('');
   const [amount,  setAmount]  = useState('');
   const [loading, setLoading] = useState(false);
@@ -544,7 +544,7 @@ function SendXCB({ network }) {
   return (
     <div style={card}>
       <h3 style={{ fontSize: '0.95rem', fontWeight: '600', marginBottom: '1rem', color: '#a78bfa' }}>
-        📤 XCB senden
+        📤 {currency} senden
       </h3>
 
       <form onSubmit={handleSubmit}>
@@ -559,7 +559,7 @@ function SendXCB({ network }) {
         </div>
 
         <div style={{ marginBottom: '0.9rem' }}>
-          <label style={labelStyle}>Betrag (XCB)</label>
+          <label style={labelStyle}>Betrag ({currency})</label>
           <input
             type="number"
             value={amount}
@@ -569,14 +569,14 @@ function SendXCB({ network }) {
             step="any"
             style={inputStyle}
           />
-          <div style={hintStyle}>Vom Deployer-Wallet. Inklusive Energy-Fee (Gas).</div>
+          <div style={hintStyle}>Vom Deployer-Wallet. Inklusive Energy-Fee.</div>
         </div>
 
         <ErrorBox msg={error} />
 
         {result && (
           <SuccessBox>
-            {amount} XCB gesendet! TX:{' '}
+            {amount} {currency} gesendet! TX:{' '}
             <a
               href={getExplorerUrl(network, 'tx', result.txHash)}
               target="_blank" rel="noopener noreferrer"
@@ -589,7 +589,7 @@ function SendXCB({ network }) {
 
         {confirm && (
           <div style={{ padding: '0.8rem', background: 'rgba(220,38,38,0.1)', border: '1px solid rgba(220,38,38,0.3)', borderRadius: '7px', marginTop: '0.6rem', fontSize: '0.85rem', color: '#fca5a5' }}>
-            <strong>Mainnet bestätigen:</strong> Wirklich {amount} XCB an {truncate(to, 10)} senden?
+            <strong>Mainnet bestätigen:</strong> Wirklich {amount} {currency} an {truncate(to, 10)} senden?
             <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
               <button type="submit" disabled={loading} style={{ flex: 1, padding: '0.5rem', background: '#dc2626', border: 'none', borderRadius: '5px', color: 'white', cursor: 'pointer', fontWeight: '600', fontSize: '0.85rem' }}>
                 {loading ? '⏳...' : 'Ja, senden'}
@@ -603,7 +603,7 @@ function SendXCB({ network }) {
 
         {!confirm && (
           <PrimaryBtn loading={loading} color={isMainnet ? '#dc2626' : '#7c3aed'}>
-            {loading ? '⏳ Sende...' : isMainnet ? '⚠️ XCB senden (Mainnet)' : '📤 XCB senden'}
+            {loading ? '⏳ Sende...' : isMainnet ? `⚠️ ${currency} senden (Mainnet)` : `📤 ${currency} senden`}
           </PrimaryBtn>
         )}
       </form>
@@ -772,7 +772,7 @@ function SendToken({ network }) {
 // ────────────────────────────────────────────
 // Haupt-Komponente
 // ────────────────────────────────────────────
-export default function WalletPage({ network }) {
+export default function WalletPage({ network, currency = 'XCB' }) {
   const [walletInfo, setWalletInfo] = useState(null);
 
   useEffect(() => {
@@ -784,7 +784,7 @@ export default function WalletPage({ network }) {
   return (
     <div>
       {/* Wallet-Info oben */}
-      <WalletInfoCard network={network} />
+      <WalletInfoCard network={network} currency={currency} />
 
       {/* Zwei-Spalten-Grid */}
       <div
@@ -795,11 +795,12 @@ export default function WalletPage({ network }) {
         <BalanceChecker
           network={network}
           deployerAddress={walletInfo?.address}
+          currency={currency}
         />
 
         {/* Rechts: XCB senden + Token senden */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
-          <SendXCB network={network} />
+          <SendXCB network={network} currency={currency} />
           <SendToken network={network} />
         </div>
       </div>

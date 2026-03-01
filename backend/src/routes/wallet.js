@@ -11,6 +11,39 @@ const express = require('express');
 const router  = express.Router();
 const blockchain = require('../services/blockchain');
 const db = require('../services/db');
+const corebc = require('corebc');
+
+// Holt Token-Bestände einer Adresse via Blockindex API (alle Tokens, nicht nur eigene)
+async function fetchTokenBalancesFromBlockindex(address) {
+  const cfg = blockchain.getNetworkConfig();
+  const url = `${cfg.blockindexApi}/address/${address}?details=tokenBalances`;
+  try {
+    const res  = await fetch(url, { signal: AbortSignal.timeout(10000) });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+
+    const TYPE_MAP = { CBC20: 'CIP-20', CBC721: 'CIP-721', CBC1155: 'CIP-1155' };
+
+    const tokens = (data.tokens || []).map(t => ({
+      type:            TYPE_MAP[t.type] || t.type,
+      name:            t.name  || '',
+      symbol:          t.symbol || '',
+      contractAddress: t.contract,
+      decimals:        t.decimals ?? 18,
+      balance: t.type === 'CBC721'
+        ? (t.ids ? t.ids.length.toString() : '0')
+        : corebc.formatUnits(t.balance || '0', t.decimals ?? 18),
+    }));
+
+    return { tokens, source: 'blockindex' };
+  } catch (err) {
+    console.warn('[wallet] Blockindex-API nicht erreichbar, fallback auf DB:', err.message);
+    // Fallback: nur eigene Deployments
+    const deployments = db.loadDeployments();
+    const tokens = await blockchain.getTokenBalancesForAddress(address, deployments);
+    return { tokens, source: 'db' };
+  }
+}
 
 // ============================================================
 // GET /api/wallet/info
@@ -33,12 +66,11 @@ router.get('/balances/:address', async (req, res) => {
     return res.status(400).json({ error: 'Ungültige Adresse (mind. 40 Zeichen)' });
 
   try {
-    const deployments = db.loadDeployments();
-    const [xcb, tokens] = await Promise.all([
+    const [xcb, { tokens, source }] = await Promise.all([
       blockchain.getBalance(address),
-      blockchain.getTokenBalancesForAddress(address, deployments),
+      fetchTokenBalancesFromBlockindex(address),
     ]);
-    res.json({ address, xcb, tokens });
+    res.json({ address, xcb, tokens, tokenSource: source });
   } catch (err) {
     res.status(500).json({ error: 'Guthaben konnte nicht geladen werden', details: err.message });
   }

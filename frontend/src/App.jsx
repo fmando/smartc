@@ -177,6 +177,7 @@ export default function App() {
     networkId: 3,
     addressPrefix: 'AB',
     explorer: 'https://xab.blockindex.net',
+    currency: 'XAB',
   };
   const isMainnet = network === 'mainnet';
 
@@ -247,7 +248,7 @@ export default function App() {
 
         {/* ===== SEITE: WALLET ===== */}
         {page === 'wallet' && (
-          <WalletPage network={network} />
+          <WalletPage network={network} currency={config.currency || 'XCB'} />
         )}
 
         {/* ===== SEITE: DEPLOYEN ===== */}
@@ -330,7 +331,7 @@ export default function App() {
                   <div style={{ color: '#94a3b8', fontSize: '0.82rem', lineHeight: '1.8' }}>
                     <div>Network ID: <code style={{ color: isMainnet ? '#fca5a5' : '#60a5fa' }}>{config.networkId}</code></div>
                     <div>Adressen: <code style={{ color: isMainnet ? '#fca5a5' : '#60a5fa' }}>{config.addressPrefix}...</code> (44 Zeichen)</div>
-                    <div>Currency: <code style={{ color: isMainnet ? '#fca5a5' : '#60a5fa' }}>XCB{isMainnet ? '' : ' (Test)'}</code></div>
+                    <div>Currency: <code style={{ color: isMainnet ? '#fca5a5' : '#60a5fa' }}>{config.currency}</code></div>
                     {!isMainnet && <div>Mining: CPU-Mining via gocore</div>}
                   </div>
                 </div>

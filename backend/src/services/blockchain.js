@@ -24,8 +24,10 @@ class BlockchainService {
         deployerAddress: process.env.TESTNET_DEPLOYER_ADDRESS || '',
         deployerPassword:process.env.TESTNET_DEPLOYER_PASSWORD || '',
         explorer:        'https://xab.blockindex.net',
+        blockindexApi:   'https://xab.blockindex.net/api/v2',
         name:            'Devín Testnet',
         networkId:       3,
+        currency:        'XAB',
       },
       mainnet: {
         rpcUrl:          process.env.MAINNET_RPC_URL || '',
@@ -34,8 +36,10 @@ class BlockchainService {
         deployerAddress: '',
         deployerPassword:'',
         explorer:        'https://blockindex.net',
+        blockindexApi:   'https://blockindex.net/api/v2',
         name:            'Core Coin Mainnet',
         networkId:       1,
+        currency:        'XCB',
       },
     };
 
@@ -88,6 +92,8 @@ class BlockchainService {
       networkId:     cfg.networkId,
       addressPrefix: cfg.networkPrefix.toUpperCase(),
       explorer:      cfg.explorer,
+      blockindexApi: cfg.blockindexApi,
+      currency:      cfg.currency,
       rpcUrl:        cfg.rpcUrl,
     };
   }
